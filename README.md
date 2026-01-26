@@ -35,8 +35,6 @@ Waits until the exact release time (typically 7pm PST for next-week bookings) an
    cd "Tee Time Helper"
    python3 -m venv tee_time_venv
    source tee_time_venv/bin/activate  # macOS/Linux
-   # or
-   tee_time_venv\Scripts\activate     # Windows
    ```
 
 3. **Install dependencies**:
@@ -58,7 +56,7 @@ Waits until the exact release time (typically 7pm PST for next-week bookings) an
 
 3. **Open your browser** and go to:
    ```
-   http://localhost:5000
+   http://127.0.0.1:5000
    ```
 
 ## Usage Guide
