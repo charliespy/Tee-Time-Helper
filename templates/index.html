@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tee Time Helper</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a1f0a;
+            --bg-secondary: #122612;
+            --bg-card: #1a3a1a;
+            --accent: #4ade80;
+            --accent-dim: #22c55e;
+            --accent-glow: rgba(74, 222, 128, 0.3);
+            --text-primary: #f0fdf4;
+            --text-secondary: #86efac;
+            --text-muted: #6b9b6b;
+            --border: #2d5a2d;
+            --error: #ef4444;
+            --warning: #fbbf24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg-primary);
+            min-height: 100vh;
+            color: var(--text-primary);
+            background-image: 
+                radial-gradient(ellipse at 20% 20%, rgba(74, 222, 128, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(34, 197, 94, 0.05) 0%, transparent 50%),
+                linear-gradient(180deg, var(--bg-primary) 0%, #061206 100%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        h1 span {
+            color: var(--accent);
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 6px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border);
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 14px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: var(--accent);
+            color: var(--bg-primary);
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .mode-btn:hover:not(.active) {
+            color: var(--text-secondary);
+            background: rgba(74, 222, 128, 0.1);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input, select {
+            padding: 14px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        input::placeholder {
+            color: var(--text-muted);
+        }
+
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b9b6b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 18px;
+            padding-right: 44px;
+        }
+
+        select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .time-range {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .time-range span {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+            color: var(--bg-primary);
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px var(--accent-glow);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: transparent;
+            border: 2px solid var(--error);
+            color: var(--error);
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: var(--error);
+            color: white;
+        }
+
+        .status-card {
+            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.running {
+            background: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .log-container {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            padding: 6px 0;
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(45, 90, 45, 0.3);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry.success {
+            color: var(--accent);
+        }
+
+        .log-entry.error {
+            color: var(--error);
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            margin-right: 10px;
+            opacity: 0.7;
+        }
+
+        /* Hide sections based on mode */
+        .instant-grab-options, .continuous-scan-options {
+            display: none;
+        }
+
+        .instant-grab-options.active, .continuous-scan-options.active {
+            display: block;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Tee Time <span>Helper</span></h1>
+            <p class="subtitle">Automated golf tee time booking</p>
+        </header>
+
+        <!-- Login Credentials -->
+        <div class="card">
+            <h2 class="card-title">Account Login</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="username">Email</label>
+                    <input type="email" id="username" placeholder="your@email.com" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter password" autocomplete="current-password">
+                </div>
+            </div>
+        </div>
+
+        <div class="mode-toggle">
+            <button class="mode-btn active" data-mode="continuous">Continuous Scan</button>
+            <button class="mode-btn" data-mode="instant">Instant Grab</button>
+        </div>
+
+        <!-- Common Options -->
+        <div class="card">
+            <h2 class="card-title">Booking Details</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="num_people">Number of Players</label>
+                    <select id="num_people">
+                        <option value="1">1 Player</option>
+                        <option value="2" selected>2 Players</option>
+                        <option value="3">3 Players</option>
+                        <option value="4">4 Players</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Continuous Scan Options -->
+        <div class="continuous-scan-options active">
+            <div class="card">
+                <h2 class="card-title">Scan Settings</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="target_date">Target Date</label>
+                        <input type="date" id="target_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="scan_interval">Scan Interval (seconds)</label>
+                        <select id="scan_interval">
+                            <option value="15">15 seconds</option>
+                            <option value="30" selected>30 seconds</option>
+                            <option value="60">1 minute</option>
+                            <option value="120">2 minutes</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Time Range</label>
+                        <div class="time-range">
+                            <select id="start_time">
+                                {% for time in time_bank %}
+                                <option value="{{ time }}" {% if time == "10:03am" %}selected{% endif %}>{{ time }}</option>
+                                {% endfor %}
+                            </select>
+                            <span>to</span>
+                            <select id="end_time">
+                                {% for time in time_bank %}
+                                <option value="{{ time }}" {% if time == "2:06pm" %}selected{% endif %}>{{ time }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instant Grab Options -->
+        <div class="instant-grab-options">
+            <div class="card">
+                <h2 class="card-title">Instant Grab Settings</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="wait_hour">Release Hour (PST)</label>
+                        <select id="wait_hour">
+                            {% for h in range(24) %}
+                            <option value="{{ h }}" {% if h == 19 %}selected{% endif %}>{{ '%02d'|format(h) }}:00</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="wait_minute">Release Minute</label>
+                        <select id="wait_minute">
+                            {% for m in range(60) %}
+                            <option value="{{ m }}" {% if m == 0 %}selected{% endif %}>:{{ '%02d'|format(m) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="calendar_row">Calendar Row</label>
+                        <input type="number" id="calendar_row" value="5" min="1" max="6">
+                    </div>
+                    <div class="form-group">
+                        <label for="calendar_col">Calendar Column</label>
+                        <input type="number" id="calendar_col" value="1" min="1" max="7">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="reservation_time">Exact Time to Book</label>
+                        <select id="reservation_time">
+                            {% for time in time_bank %}
+                            <option value="{{ time }}" {% if time == "2:06pm" %}selected{% endif %}>{{ time }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="card">
+            <div class="btn-group">
+                <button class="btn btn-primary" id="startBtn">Start Scanner</button>
+                <button class="btn btn-danger" id="stopBtn" disabled>Stop</button>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="card status-card">
+            <h2 class="card-title">Status</h2>
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-text" id="statusText">Idle</span>
+            </div>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry">Ready to start scanning...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let currentMode = 'continuous';
+        let isRunning = false;
+        let statusInterval = null;
+
+        // Elements
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const continuousOptions = document.querySelector('.continuous-scan-options');
+        const instantOptions = document.querySelector('.instant-grab-options');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const logContainer = document.getElementById('logContainer');
+
+        // Set default date to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById('target_date').value = tomorrow.toISOString().split('T')[0];
+
+        // Mode toggle
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                modeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+                
+                if (currentMode === 'continuous') {
+                    continuousOptions.classList.add('active');
+                    instantOptions.classList.remove('active');
+                } else {
+                    continuousOptions.classList.remove('active');
+                    instantOptions.classList.add('active');
+                }
+            });
+        });
+
+        // Add log entry
+        function addLog(message, type = '') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="log-time">${time}</span>${message}`;
+            
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Update status
+        function updateStatus(status, running) {
+            statusText.textContent = status;
+            isRunning = running;
+            
+            if (running) {
+                statusDot.classList.add('running');
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            } else {
+                statusDot.classList.remove('running');
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        }
+
+        // Poll status
+        async function pollStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                updateStatus(data.status, data.is_running);
+                
+                data.messages.forEach(msg => {
+                    const type = msg.toLowerCase().includes('error') ? 'error' : 
+                                 msg.toLowerCase().includes('success') ? 'success' : '';
+                    addLog(msg, type);
+                });
+                
+                if (!data.is_running && statusInterval) {
+                    // Keep polling but less frequently when idle
+                }
+            } catch (error) {
+                console.error('Status poll error:', error);
+            }
+        }
+
+        // Start scanner
+        startBtn.addEventListener('click', async () => {
+            // Validate credentials
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                addLog('Error: Please enter your email and password', 'error');
+                return;
+            }
+            
+            let endpoint, payload;
+            
+            if (currentMode === 'continuous') {
+                endpoint = '/api/continuous-scan';
+                payload = {
+                    username: username,
+                    password: password,
+                    num_people: document.getElementById('num_people').value,
+                    target_date: document.getElementById('target_date').value,
+                    start_time: document.getElementById('start_time').value,
+                    end_time: document.getElementById('end_time').value,
+                    scan_interval: document.getElementById('scan_interval').value
+                };
+            } else {
+                endpoint = '/api/instant-grab';
+                payload = {
+                    username: username,
+                    password: password,
+                    num_people: document.getElementById('num_people').value,
+                    wait_hour: document.getElementById('wait_hour').value,
+                    wait_minute: document.getElementById('wait_minute').value,
+                    row: document.getElementById('calendar_row').value,
+                    col: document.getElementById('calendar_col').value,
+                    reservation_time: document.getElementById('reservation_time').value
+                };
+            }
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`Started: ${data.message}`, 'success');
+                    updateStatus('Starting...', true);
+                    
+                    // Start polling
+                    if (statusInterval) clearInterval(statusInterval);
+                    statusInterval = setInterval(pollStatus, 1000);
+                } else {
+                    addLog(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Stop scanner
+        stopBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/stop', { method: 'POST' });
+                const data = await response.json();
+                addLog(data.message);
+            } catch (error) {
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Initial status poll
+        pollStatus();
+        statusInterval = setInterval(pollStatus, 2000);
+    </script>
+</body>
+</html>
