@@ -23,13 +23,13 @@ def status_callback(message):
     print(f"[Scanner] {message}")
 
 
-def run_instant_grab(username, password, num_people, wait_until, row, col, reservation_time):
+def run_instant_grab(username, password, num_people, wait_until, target_date, reservation_time):
     """Run instant grab in a background thread."""
     global scanner, is_scanning
     is_scanning = True
     scanner = TeeTimeScanner(username=username, password=password, status_callback=status_callback)
     try:
-        scanner.instant_grab(num_people, wait_until, row, col, reservation_time)
+        scanner.instant_grab(num_people, wait_until, target_date, reservation_time)
     except Exception as e:
         status_callback(f"Error: {e}")
     finally:
@@ -94,9 +94,11 @@ def start_instant_grab():
         return jsonify({'error': 'Username and password are required'}), 400
     
     num_people = int(data.get('num_people', 2))
-    row = int(data.get('row', 5))
-    col = int(data.get('col', 1))
+    target_date = data.get('target_date')  # YYYY-MM-DD format
     reservation_time = data.get('reservation_time', '2:06pm')
+    
+    if not target_date:
+        return jsonify({'error': 'target_date is required'}), 400
     
     # Parse wait time
     wait_hour = int(data.get('wait_hour', 19))
@@ -113,14 +115,15 @@ def start_instant_grab():
     
     scanner_thread = threading.Thread(
         target=run_instant_grab,
-        args=(username, password, num_people, wait_until, row, col, reservation_time),
+        args=(username, password, num_people, wait_until, target_date, reservation_time),
         daemon=True
     )
     scanner_thread.start()
     
     return jsonify({
         'message': 'Instant grab started',
-        'wait_until': wait_until.isoformat()
+        'wait_until': wait_until.isoformat(),
+        'target_date': target_date
     })
 
 
@@ -145,7 +148,7 @@ def start_continuous_scan():
     target_date = data.get('target_date')  # YYYY-MM-DD format
     start_time = data.get('start_time', '10:00am')
     end_time = data.get('end_time', '2:00pm')
-    scan_interval = int(data.get('scan_interval', 30))
+    scan_interval = int(data.get('scan_interval', 60))
     
     if not target_date:
         return jsonify({'error': 'target_date is required'}), 400

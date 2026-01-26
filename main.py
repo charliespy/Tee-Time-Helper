@@ -86,7 +86,7 @@ class TeeTimeScanner:
             raise ValueError("Username and password are required")
             
         self.update_status("Navigating to login page...")
-        self.driver.get("https://foreupsoftware.com/index.php/booking/19348#/login")
+        self.driver.get("https://foreupsoftware.com/index.php/booking/19347/1468#/teetimes")
         
         self.update_status("Entering credentials...")
         username_field = self.wait.until(EC.presence_of_element_located((By.ID, "login_email")))
@@ -103,21 +103,17 @@ class TeeTimeScanner:
         self.update_status("Logged in successfully!")
         
     def navigate_to_reservations(self):
-        """Navigate to the reservations tab."""
+        """Navigate to the reservations page."""
         self.update_status("Navigating to reservations...")
-        reservations_tab = self.wait.until(EC.element_to_be_clickable((By.ID, "reservations-tab")))
-        reservations_tab.click()
+        self.driver.get("https://foreupsoftware.com/index.php/booking/19347/1468#/teetimes")
         time.sleep(1)
         
     def start_new_reservation(self, num_people):
         """Start a new reservation with the specified number of people."""
         self.update_status("Starting new reservation...")
-        reserve_button = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "btn-primary")))
-        reserve_button.click()
-        time.sleep(1)
-        
-        book_now_button = self.wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='BOOK NOW']")))
-        book_now_button.click()
+        resident_button = self.wait.until(EC.element_to_be_clickable(
+            (By.XPATH, "//button[contains(text(), 'Resident (0 - 7 Days)')]")))
+        resident_button.click()
         time.sleep(1)
         
         self.update_status(f"Selecting {num_people} player(s)...")
@@ -126,14 +122,14 @@ class TeeTimeScanner:
         players_button.click()
         time.sleep(1)
         
-    def select_date(self, row, col):
-        """Select a date from the calendar using row and column."""
-        self.update_status(f"Selecting date at row {row}, column {col}...")
-        td_element = self.wait.until(EC.element_to_be_clickable(
-            (By.XPATH, f"(//table[contains(@class, 'table-condensed')]//tbody//tr[{row}]//td[{col}])")))
-        self.update_status(f"Found date: {td_element.text}")
-        td_element.click()
-        time.sleep(2)
+    # def select_date(self, row, col):
+    #     """Select a date from the calendar using row and column."""
+    #     self.update_status(f"Selecting date at row {row}, column {col}...")
+    #     td_element = self.wait.until(EC.element_to_be_clickable(
+    #         (By.XPATH, f"(//table[contains(@class, 'table-condensed')]//tbody//tr[{row}]//td[{col}])")))
+    #     self.update_status(f"Found date: {td_element.text}")
+    #     td_element.click()
+    #     time.sleep(2)
         
     def select_date_by_value(self, target_date):
         """Select a date from the calendar by its date value (YYYY-MM-DD format)."""
@@ -141,26 +137,50 @@ class TeeTimeScanner:
         
         # Parse the target date
         target = datetime.datetime.strptime(target_date, "%Y-%m-%d")
+        target_day = str(target.day)
+        target_month_year = target.strftime("%B %Y")  # e.g., "February 2026"
         
         # Navigate to the correct month if needed
         max_attempts = 12
         for _ in range(max_attempts):
             try:
-                # Try to find and click the date directly
-                date_element = self.wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, f"//td[@data-date='{target_date}' and not(contains(@class, 'disabled'))]")))
-                date_element.click()
-                time.sleep(2)
-                self.update_status(f"Selected date: {target_date}")
-                return True
+                # Check if we're on the correct month by reading the calendar header
+                # The header typically shows "Month Year" (e.g., "January 2026")
+                month_header = self.driver.find_element(
+                    By.XPATH, "//th[@class='datepicker-switch']"
+                ).text.strip()
+                
+                self.update_status(f"Current calendar month: {month_header}, looking for: {target_month_year}")
+                
+                if month_header == target_month_year:
+                    # We're on the correct month, find and click the day
+                    # Look for a td with class "day" that:
+                    # - Is NOT disabled, old, or new
+                    # - Contains the target day number
+                    date_element = self.wait.until(EC.element_to_be_clickable(
+                        (By.XPATH, f"//td[contains(@class, 'day') and not(contains(@class, 'disabled')) and not(contains(@class, 'old')) and not(contains(@class, 'new')) and normalize-space(text())='{target_day}']")))
+                    date_element.click()
+                    time.sleep(2)
+                    self.update_status(f"Selected date: {target_date}")
+                    return True
+                else:
+                    # Not on the correct month, click next
+                    next_button = self.driver.find_element(By.XPATH, "//th[@class='next']")
+                    next_button.click()
+                    time.sleep(0.5)
+                    
             except TimeoutException:
-                # Click next month button
+                self.update_status(f"Timeout waiting for date element")
+                # Try clicking next month
                 try:
                     next_button = self.driver.find_element(By.XPATH, "//th[@class='next']")
                     next_button.click()
                     time.sleep(0.5)
                 except NoSuchElementException:
                     break
+            except NoSuchElementException as e:
+                self.update_status(f"Element not found: {e}")
+                break
         
         self.update_status(f"Could not find date: {target_date}")
         return False
@@ -212,15 +232,14 @@ class TeeTimeScanner:
         
     # ==================== Mode 1: Instant Grab ====================
     
-    def instant_grab(self, num_people, wait_until, row, col, reservation_time):
+    def instant_grab(self, num_people, wait_until, target_date, reservation_time):
         """
         Original functionality: Wait until release time, then grab a specific tee time.
         
         Args:
             num_people: Number of players
             wait_until: datetime to wait until before grabbing
-            row: Calendar row for the date
-            col: Calendar column for the date
+            target_date: Date to book (YYYY-MM-DD format)
             reservation_time: Specific time to book (e.g., '2:06pm')
         """
         try:
@@ -235,7 +254,7 @@ class TeeTimeScanner:
             while self.is_running:
                 now = datetime.datetime.now(pst)
                 if now >= wait_until:
-                    self.select_date(row, col)
+                    self.select_date_by_value(target_date)
                     self.book_time(reservation_time)
                     break
                 time.sleep(0.001)
@@ -248,7 +267,7 @@ class TeeTimeScanner:
             
     # ==================== Mode 2: Continuous Scan ====================
     
-    def continuous_scan(self, num_people, target_date, start_time, end_time, scan_interval=30):
+    def continuous_scan(self, num_people, target_date, start_time, end_time, scan_interval=60):
         """
         New functionality: Continuously scan for available times in a range.
         
@@ -303,32 +322,3 @@ class TeeTimeScanner:
             self.update_status(f"Error: {e}")
             raise
 
-
-# ==================== Legacy function for backwards compatibility ====================
-
-def reserve_tee_time(username, password, num_people, wait_until, row, col, reservation_time):
-    """Legacy function that wraps the TeeTimeScanner for backwards compatibility."""
-    scanner = TeeTimeScanner(username=username, password=password)
-    try:
-        scanner.instant_grab(num_people, wait_until, row, col, reservation_time)
-        input("Press Enter to exit...")
-    finally:
-        scanner.stop_browser()
-
-
-if __name__ == '__main__':
-    import getpass
-    
-    print("=== Tee Time Helper (CLI Mode) ===")
-    username = input("Enter your email: ")
-    password = getpass.getpass("Enter your password: ")
-    
-    pst = pytz.timezone('America/Los_Angeles')
-    standard_wait = datetime.datetime.now(pst).replace(hour=19, minute=0, second=0, microsecond=0)
-    
-    num_people = 2
-    row = 5
-    col = 1
-    reservation_time = '2:06pm'
-    
-    reserve_tee_time(username, password, num_people, standard_wait, row, col, reservation_time)

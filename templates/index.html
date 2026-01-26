@@ -421,10 +421,10 @@
                     <div class="form-group">
                         <label for="scan_interval">Scan Interval (seconds)</label>
                         <select id="scan_interval">
-                            <option value="15">15 seconds</option>
-                            <option value="30" selected>30 seconds</option>
-                            <option value="60">1 minute</option>
-                            <option value="120">2 minutes</option>
+                            <option value="10">10 seconds</option>
+                            <option value="60" selected>1 minute</option>
+                            <option value="300">5 minutes</option>
+                            <option value="1800">30 minutes</option>
                         </select>
                     </div>
                     <div class="form-group full-width">
@@ -432,13 +432,13 @@
                         <div class="time-range">
                             <select id="start_time">
                                 {% for time in time_bank %}
-                                <option value="{{ time }}" {% if time == "10:03am" %}selected{% endif %}>{{ time }}</option>
+                                <option value="{{ time }}" {% if time == "7:57am" %}selected{% endif %}>{{ time }}</option>
                                 {% endfor %}
                             </select>
                             <span>to</span>
                             <select id="end_time">
                                 {% for time in time_bank %}
-                                <option value="{{ time }}" {% if time == "2:06pm" %}selected{% endif %}>{{ time }}</option>
+                                <option value="{{ time }}" {% if time == "1:03pm" %}selected{% endif %}>{{ time }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -589,8 +589,10 @@
                     addLog(msg, type);
                 });
                 
+                // Stop polling when scan is no longer running
                 if (!data.is_running && statusInterval) {
-                    // Keep polling but less frequently when idle
+                    clearInterval(statusInterval);
+                    statusInterval = null;
                 }
             } catch (error) {
                 console.error('Status poll error:', error);
@@ -670,9 +672,6 @@
             }
         });
 
-        // Initial status poll
-        pollStatus();
-        statusInterval = setInterval(pollStatus, 2000);
     </script>
 </body>
 </html>
