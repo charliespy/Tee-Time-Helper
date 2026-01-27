@@ -102,6 +102,15 @@
             background: rgba(74, 222, 128, 0.1);
         }
 
+        /* Hide sections based on mode */
+        .instant-grab-options, .continuous-scan-options {
+            display: none;
+        }
+
+        .instant-grab-options.active, .continuous-scan-options.active {
+            display: block;
+        }
+
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -318,14 +327,6 @@
             opacity: 0.7;
         }
 
-        /* Hide sections based on mode */
-        .instant-grab-options, .continuous-scan-options {
-            display: none;
-        }
-
-        .instant-grab-options.active, .continuous-scan-options.active {
-            display: block;
-        }
 
         /* Scrollbar styling */
         ::-webkit-scrollbar {
@@ -387,6 +388,7 @@
                 </div>
             </div>
         </div>
+
 
         <div class="mode-toggle">
             <button class="mode-btn active" data-mode="continuous">Continuous Scan</button>
@@ -453,6 +455,18 @@
                 <h2 class="card-title">Instant Grab Settings</h2>
                 <div class="form-grid">
                     <div class="form-group">
+                        <label for="instant_target_date">Target Date</label>
+                        <input type="date" id="instant_target_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="reservation_time">Exact Time to Book</label>
+                        <select id="reservation_time">
+                            {% for time in time_bank %}
+                            <option value="{{ time }}" {% if time == "7:57am" %}selected{% endif %}>{{ time }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="wait_hour">Release Hour (PST)</label>
                         <select id="wait_hour">
                             {% for h in range(24) %}
@@ -465,22 +479,6 @@
                         <select id="wait_minute">
                             {% for m in range(60) %}
                             <option value="{{ m }}" {% if m == 0 %}selected{% endif %}>:{{ '%02d'|format(m) }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="calendar_row">Calendar Row</label>
-                        <input type="number" id="calendar_row" value="5" min="1" max="6">
-                    </div>
-                    <div class="form-group">
-                        <label for="calendar_col">Calendar Column</label>
-                        <input type="number" id="calendar_col" value="1" min="1" max="7">
-                    </div>
-                    <div class="form-group full-width">
-                        <label for="reservation_time">Exact Time to Book</label>
-                        <select id="reservation_time">
-                            {% for time in time_bank %}
-                            <option value="{{ time }}" {% if time == "2:06pm" %}selected{% endif %}>{{ time }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -529,6 +527,7 @@
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         document.getElementById('target_date').value = tomorrow.toISOString().split('T')[0];
+        document.getElementById('instant_target_date').value = tomorrow.toISOString().split('T')[0];
 
         // Mode toggle
         modeBtns.forEach(btn => {
@@ -629,11 +628,10 @@
                     username: username,
                     password: password,
                     num_people: document.getElementById('num_people').value,
+                    target_date: document.getElementById('instant_target_date').value,
+                    reservation_time: document.getElementById('reservation_time').value,
                     wait_hour: document.getElementById('wait_hour').value,
-                    wait_minute: document.getElementById('wait_minute').value,
-                    row: document.getElementById('calendar_row').value,
-                    col: document.getElementById('calendar_col').value,
-                    reservation_time: document.getElementById('reservation_time').value
+                    wait_minute: document.getElementById('wait_minute').value
                 };
             }
             

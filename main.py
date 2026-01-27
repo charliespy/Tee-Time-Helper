@@ -86,7 +86,8 @@ class TeeTimeScanner:
             raise ValueError("Username and password are required")
             
         self.update_status("Navigating to login page...")
-        self.driver.get("https://foreupsoftware.com/index.php/booking/19347/1468#/teetimes")
+        # self.driver.get("https://foreupsoftware.com/index.php/booking/19347/1468#/teetimes") # Torrey
+        self.driver.get("https://foreupsoftware.com/index.php/booking/19346/1469#/teetimes") # mission
         
         self.update_status("Entering credentials...")
         username_field = self.wait.until(EC.presence_of_element_located((By.ID, "login_email")))
@@ -105,14 +106,16 @@ class TeeTimeScanner:
     def navigate_to_reservations(self):
         """Navigate to the reservations page."""
         self.update_status("Navigating to reservations...")
-        self.driver.get("https://foreupsoftware.com/index.php/booking/19347/1468#/teetimes")
+        # self.driver.get("https://foreupsoftware.com/index.php/booking/19347/1468#/teetimes") # Torrey
+        self.driver.get("https://foreupsoftware.com/index.php/booking/19346/1469#/teetimes") # mission
         time.sleep(1)
         
     def start_new_reservation(self, num_people):
         """Start a new reservation with the specified number of people."""
         self.update_status("Starting new reservation...")
         resident_button = self.wait.until(EC.element_to_be_clickable(
-            (By.XPATH, "//button[contains(text(), 'Resident (0 - 7 Days)')]")))
+            # (By.XPATH, "//button[contains(text(), 'Resident (0 - 7 Days)')]"))) # Torrey
+            (By.XPATH, "//button[contains(text(), 'STANDARD TEE TIMES')]"))) # mission
         resident_button.click()
         time.sleep(1)
         
@@ -121,15 +124,6 @@ class TeeTimeScanner:
             (By.XPATH, f"//a[@class='btn btn-primary' and @data-value='{num_people}']")))
         players_button.click()
         time.sleep(1)
-        
-    # def select_date(self, row, col):
-    #     """Select a date from the calendar using row and column."""
-    #     self.update_status(f"Selecting date at row {row}, column {col}...")
-    #     td_element = self.wait.until(EC.element_to_be_clickable(
-    #         (By.XPATH, f"(//table[contains(@class, 'table-condensed')]//tbody//tr[{row}]//td[{col}])")))
-    #     self.update_status(f"Found date: {td_element.text}")
-    #     td_element.click()
-    #     time.sleep(2)
         
     def select_date_by_value(self, target_date):
         """Select a date from the calendar by its date value (YYYY-MM-DD format)."""
@@ -209,32 +203,29 @@ class TeeTimeScanner:
         matching = [t for t in available if is_time_in_range(t, start_time, end_time)]
         return matching
         
-    def book_time(self, reservation_time):
-        """Book a specific tee time."""
-        self.update_status(f"Booking time: {reservation_time}...")
+    def refresh_times(self, target_date):
+        """Refresh the tee times by re-selecting the date."""
+        self.update_status("Refreshing tee times...")
+        self.select_date_by_value(target_date)
+    
+    def click_time_tile(self, reservation_time):
+        """Click a specific tee time tile to open the booking modal."""
+        self.update_status(f"Clicking time tile: {reservation_time}...")
         
         time_tile = self.wait.until(EC.element_to_be_clickable(
             (By.XPATH, f"//div[contains(@class, 'booking-start-time-label') and text()='{reservation_time}']")))
         time_tile.click()
         time.sleep(1)
         
-        book_time_button = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "js-book-button")))
-        book_time_button.click()
-        time.sleep(1)
-        
-        self.update_status(f"Successfully booked {reservation_time}!")
+        self.update_status(f"*** BOOKING MODAL OPEN - Complete the booking manually! ***")
         return True
-        
-    def refresh_times(self):
-        """Refresh the tee times page."""
-        self.driver.refresh()
-        time.sleep(2)
         
     # ==================== Mode 1: Instant Grab ====================
     
     def instant_grab(self, num_people, wait_until, target_date, reservation_time):
         """
-        Original functionality: Wait until release time, then grab a specific tee time.
+        Wait until release time, then navigate to the time slot and open booking modal.
+        User must manually complete the booking (CAPTCHA, confirmation, etc.).
         
         Args:
             num_people: Number of players
@@ -249,34 +240,38 @@ class TeeTimeScanner:
             self.start_new_reservation(num_people)
             
             pst = pytz.timezone('America/Los_Angeles')
-            self.update_status("Waiting for release time...")
+            self.update_status(f"Waiting for release time: {wait_until.strftime('%H:%M:%S')} PST...")
             
             while self.is_running:
                 now = datetime.datetime.now(pst)
                 if now >= wait_until:
+                    self.update_status("Release time reached! Selecting date...")
                     self.select_date_by_value(target_date)
-                    self.book_time(reservation_time)
+                    self.click_time_tile(reservation_time)
+                    self.update_status("*** COMPLETE THE BOOKING MANUALLY NOW! ***")
                     break
                 time.sleep(0.001)
                 
-            self.update_status("Instant grab complete!")
-            
+            # Keep browser open for manual booking
+            while self.is_running:
+                time.sleep(1)
+                
         except Exception as e:
             self.update_status(f"Error: {e}")
             raise
-            
-    # ==================== Mode 2: Continuous Scan ====================
+        
+    # ==================== Mode 2: Continuous Scan (Monitor Only) ====================
     
     def continuous_scan(self, num_people, target_date, start_time, end_time, scan_interval=60):
         """
-        New functionality: Continuously scan for available times in a range.
+        Monitor for available tee times in a range (does not book automatically).
         
         Args:
             num_people: Number of players
-            target_date: Date to book (YYYY-MM-DD format)
+            target_date: Date to monitor (YYYY-MM-DD format)
             start_time: Start of time range (e.g., '10:00am')
             end_time: End of time range (e.g., '2:00pm')
-            scan_interval: Seconds between scans (default 30)
+            scan_interval: Seconds between scans (default 60)
         """
         try:
             self.start_browser()
@@ -296,12 +291,8 @@ class TeeTimeScanner:
                 matching_times = self.scan_available_times(start_time, end_time)
                 
                 if matching_times:
-                    self.update_status(f"Found available times: {matching_times}")
-                    # Book the first available time
-                    first_time = matching_times[0]
-                    if self.book_time(first_time):
-                        self.update_status(f"Successfully booked {first_time}!")
-                        return True
+                    self.update_status(f"*** FOUND AVAILABLE TIMES: {matching_times} ***")
+                    # Keep scanning - user will manually book
                 else:
                     self.update_status(f"No times available in range. Next scan in {scan_interval}s...")
                     
@@ -313,7 +304,7 @@ class TeeTimeScanner:
                     
                 # Refresh the page for fresh data
                 if self.is_running:
-                    self.refresh_times()
+                    self.refresh_times(target_date)
                     
             self.update_status("Scan stopped.")
             return False

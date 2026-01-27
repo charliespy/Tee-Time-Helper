@@ -95,7 +95,7 @@ def start_instant_grab():
     
     num_people = int(data.get('num_people', 2))
     target_date = data.get('target_date')  # YYYY-MM-DD format
-    reservation_time = data.get('reservation_time', '2:06pm')
+    reservation_time = data.get('reservation_time', '7:57am')
     
     if not target_date:
         return jsonify({'error': 'target_date is required'}), 400
@@ -123,7 +123,8 @@ def start_instant_grab():
     return jsonify({
         'message': 'Instant grab started',
         'wait_until': wait_until.isoformat(),
-        'target_date': target_date
+        'target_date': target_date,
+        'reservation_time': reservation_time
     })
 
 
