@@ -2,10 +2,17 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 import datetime
 import pytz
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Time slots available at the course (9-minute intervals)
 TIME_BANK = [
@@ -52,22 +59,73 @@ def get_times_in_range(start_time, end_time):
 
 
 class TeeTimeScanner:
-    def __init__(self, username=None, password=None, status_callback=None):
+    def __init__(self, username=None, password=None, status_callback=None, enable_notifications=False):
         self.driver = None
         self.wait = None
         self.is_running = False
         self.username = username
         self.password = password
         self.status_callback = status_callback or (lambda msg: print(msg))
+        self.enable_notifications = enable_notifications
+        self.notified_times = set()  # Track times we've already notified about
         
     def update_status(self, message):
         """Update status via callback."""
         self.status_callback(message)
+    
+    def send_push_notification(self, message, title="Tee Time Alert"):
+        """Send a push notification via Pushover."""
+        if not self.enable_notifications:
+            return False
+        
+        # Get Pushover credentials from environment variables
+        user_key = os.getenv('PUSHOVER_USER_KEY')
+        api_token = os.getenv('PUSHOVER_API_TOKEN')
+        
+        if not all([user_key, api_token]):
+            self.update_status("Notifications not configured: Missing Pushover credentials in .env file")
+            return False
+        
+        try:
+            import requests
+            response = requests.post(
+                "https://api.pushover.net/1/messages.json",
+                data={
+                    "token": api_token,
+                    "user": user_key,
+                    "title": title,
+                    "message": message,
+                    "priority": 1,  # High priority - shows as highlighted
+                    "sound": "cashregister"  # Fun sound for tee time alerts
+                }
+            )
+            if response.status_code == 200:
+                self.update_status("Push notification sent!")
+                return True
+            else:
+                self.update_status(f"Pushover error: {response.text}")
+                return False
+        except Exception as e:
+            self.update_status(f"Failed to send notification: {e}")
+            return False
         
     def start_browser(self):
-        """Initialize the Chrome browser."""
+        """Initialize the Chrome browser in headless mode for server deployment."""
         self.update_status("Starting browser...")
-        self.driver = webdriver.Chrome()
+        
+        options = Options()
+        options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--window-size=1920,1080')
+        
+        # For Linux servers (uncomment if needed)
+        # options.binary_location = '/usr/bin/chromium-browser'
+        # service = Service('/usr/bin/chromedriver')
+        # self.driver = webdriver.Chrome(service=service, options=options)
+        
+        self.driver = webdriver.Chrome(options=options)
         self.wait = WebDriverWait(self.driver, 30)
         self.is_running = True
         
@@ -208,59 +266,7 @@ class TeeTimeScanner:
         self.update_status("Refreshing tee times...")
         self.select_date_by_value(target_date)
     
-    def click_time_tile(self, reservation_time):
-        """Click a specific tee time tile to open the booking modal."""
-        self.update_status(f"Clicking time tile: {reservation_time}...")
-        
-        time_tile = self.wait.until(EC.element_to_be_clickable(
-            (By.XPATH, f"//div[contains(@class, 'booking-start-time-label') and text()='{reservation_time}']")))
-        time_tile.click()
-        time.sleep(1)
-        
-        self.update_status(f"*** BOOKING MODAL OPEN - Complete the booking manually! ***")
-        return True
-        
-    # ==================== Mode 1: Instant Grab ====================
-    
-    def instant_grab(self, num_people, wait_until, target_date, reservation_time):
-        """
-        Wait until release time, then navigate to the time slot and open booking modal.
-        User must manually complete the booking (CAPTCHA, confirmation, etc.).
-        
-        Args:
-            num_people: Number of players
-            wait_until: datetime to wait until before grabbing
-            target_date: Date to book (YYYY-MM-DD format)
-            reservation_time: Specific time to book (e.g., '2:06pm')
-        """
-        try:
-            self.start_browser()
-            self.login()
-            self.navigate_to_reservations()
-            self.start_new_reservation(num_people)
-            
-            pst = pytz.timezone('America/Los_Angeles')
-            self.update_status(f"Waiting for release time: {wait_until.strftime('%H:%M:%S')} PST...")
-            
-            while self.is_running:
-                now = datetime.datetime.now(pst)
-                if now >= wait_until:
-                    self.update_status("Release time reached! Selecting date...")
-                    self.select_date_by_value(target_date)
-                    self.click_time_tile(reservation_time)
-                    self.update_status("*** COMPLETE THE BOOKING MANUALLY NOW! ***")
-                    break
-                time.sleep(0.001)
-                
-            # Keep browser open for manual booking
-            while self.is_running:
-                time.sleep(1)
-                
-        except Exception as e:
-            self.update_status(f"Error: {e}")
-            raise
-        
-    # ==================== Mode 2: Continuous Scan (Monitor Only) ====================
+    # ==================== Continuous Scan (Monitor Only) ====================
     
     def continuous_scan(self, num_people, target_date, start_time, end_time, scan_interval=60):
         """
@@ -292,6 +298,17 @@ class TeeTimeScanner:
                 
                 if matching_times:
                     self.update_status(f"*** FOUND AVAILABLE TIMES: {matching_times} ***")
+                    
+                    # Send notification for newly found times (avoid spamming for same times)
+                    new_times = [t for t in matching_times if t not in self.notified_times]
+                    if new_times and self.enable_notifications:
+                        times_str = ', '.join(new_times)
+                        self.send_push_notification(
+                            f"{times_str} on {target_date}\n\nBook now before it's gone at https://foreupsoftware.com/index.php/booking/19346/1469#/teetimes!",
+                            title="Tee Time Available!"
+                        )
+                        self.notified_times.update(new_times)
+                    
                     # Keep scanning - user will manually book
                 else:
                     self.update_status(f"No times available in range. Next scan in {scan_interval}s...")
